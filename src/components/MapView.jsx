@@ -361,18 +361,20 @@ const OVERPASS_URLS = [
   'https://overpass.openstreetmap.ru/api/interpreter',
 ];
 
+// Racing all mirrors (instead of trying them one at a time) matters because these free
+// public instances don't fail fast — a stalled one hangs for the full timeout with no
+// response at all, rather than refusing the connection. Trying them sequentially at a
+// generous per-request timeout meant a bad mirror could block the whole query for
+// upwards of a minute before the others even got a turn.
+const OVERPASS_TIMEOUT_MS = 9000;
+
 async function queryOverpass(query) {
-  let lastErr;
-  for (const url of OVERPASS_URLS) {
-    try {
-      const res = await fetch(url, { method: 'POST', body: `data=${encodeURIComponent(query)}`, signal: AbortSignal.timeout(20000) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } catch (err) {
-      lastErr = err;
-    }
-  }
-  throw lastErr;
+  const attempts = OVERPASS_URLS.map(async (url) => {
+    const res = await fetch(url, { method: 'POST', body: `data=${encodeURIComponent(query)}`, signal: AbortSignal.timeout(OVERPASS_TIMEOUT_MS) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  });
+  return Promise.any(attempts);
 }
 
 /** Fetches OSM waterway geometry for the current viewport and draws it as named polylines. */
