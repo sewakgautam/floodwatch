@@ -2,7 +2,7 @@
 
 import '@/lib/i18n';
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTranslation } from 'react-i18next';
@@ -313,6 +313,12 @@ const SATELLITE_TILE = {
   url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
   attribution: 'Tiles &copy; Esri',
 };
+// Raw satellite imagery has no place names — Esri's reference layer overlays
+// boundaries/city/road labels on top of it, same as the "Imagery Hybrid" basemap.
+const SATELLITE_LABELS_TILE = {
+  url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+  attribution: 'Tiles &copy; Esri',
+};
 const STREETS_TILE = {
   url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -342,31 +348,60 @@ function FlyToLocation({ position }) {
 // Below this zoom, an Overpass query would cover too much of the country to be useful
 // (or fast) — river lines only load once the user has zoomed in on a specific area.
 const RIVER_LINE_MIN_ZOOM = 11;
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+// Nepal's mountainous terrain has a dense tributary/stream network compared to flatter
+// regions — including "stream" at the same zoom the UK would be fine with risks the
+// Overpass query timing out or getting rate-limited, so streams only load once zoomed
+// in further; "river" (the larger, more useful lines) loads from RIVER_LINE_MIN_ZOOM.
+const STREAM_MIN_ZOOM = 13;
+// Multiple public mirrors of the same free Overpass service — falls over to the next
+// one if the first is rate-limited or times out, rather than silently showing nothing.
+const OVERPASS_URLS = [
+  'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.openstreetmap.ru/api/interpreter',
+];
 
-/** Fetches OSM waterway geometry for the current viewport and draws it as polylines. */
-function RiverLines({ enabled }) {
+async function queryOverpass(query) {
+  let lastErr;
+  for (const url of OVERPASS_URLS) {
+    try {
+      const res = await fetch(url, { method: 'POST', body: `data=${encodeURIComponent(query)}`, signal: AbortSignal.timeout(20000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr;
+}
+
+/** Fetches OSM waterway geometry for the current viewport and draws it as named polylines. */
+function RiverLines({ enabled, onStatusChange }) {
   const [lines, setLines] = useState([]);
   const debounceRef = useRef(null);
 
   const fetchForBounds = useCallback((map) => {
-    if (map.getZoom() < RIVER_LINE_MIN_ZOOM) {
+    const zoom = map.getZoom();
+    if (zoom < RIVER_LINE_MIN_ZOOM) {
       setLines([]);
+      onStatusChange('zoomIn');
       return;
     }
+    const waterwayTypes = zoom >= STREAM_MIN_ZOOM ? 'river|stream|canal' : 'river';
     const b = map.getBounds();
     const bbox = `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
-    const query = `[out:json][timeout:25];(way["waterway"~"river|stream"](${bbox}););out geom;`;
-    fetch(OVERPASS_URL, { method: 'POST', body: `data=${encodeURIComponent(query)}` })
-      .then((r) => r.json())
+    const query = `[out:json][timeout:20];(way["waterway"~"${waterwayTypes}"](${bbox}););out geom tags;`;
+    onStatusChange('loading');
+    queryOverpass(query)
       .then((data) => {
         const ways = (data.elements ?? [])
           .filter((el) => el.type === 'way' && el.geometry)
-          .map((el) => el.geometry.map((g) => [g.lat, g.lon]));
+          .map((el) => ({ positions: el.geometry.map((g) => [g.lat, g.lon]), name: el.tags?.name ?? null }));
         setLines(ways);
+        onStatusChange('idle');
       })
-      .catch(() => {}); // Overpass is a shared free service — a failed/rate-limited fetch just means no river lines this time.
-  }, []);
+      .catch(() => onStatusChange('error')); // Free shared service — surface the failure instead of silently showing nothing.
+  }, [onStatusChange]);
 
   const map = useMapEvents({
     moveend: () => {
@@ -378,12 +413,14 @@ function RiverLines({ enabled }) {
 
   useEffect(() => {
     if (enabled) fetchForBounds(map);
-    else setLines([]);
-  }, [enabled, map, fetchForBounds]);
+    else { setLines([]); onStatusChange('idle'); }
+  }, [enabled, map, fetchForBounds, onStatusChange]);
 
   if (!enabled) return null;
-  return lines.map((positions, i) => (
-    <Polyline key={i} positions={positions} pathOptions={{ color: '#38bdf8', weight: 2, opacity: 0.7 }} />
+  return lines.map(({ positions, name }, i) => (
+    <Polyline key={i} positions={positions} pathOptions={{ color: '#38bdf8', weight: 2, opacity: 0.7 }}>
+      {name && <Tooltip sticky>{name}</Tooltip>}
+    </Polyline>
   ));
 }
 
@@ -399,6 +436,7 @@ export default function MapView() {
   const [mySubscriptions, setMySubscriptions] = useState({});
   const [satelliteMode, setSatelliteMode] = useState(false);
   const [showRivers, setShowRivers] = useState(false);
+  const [riverStatus, setRiverStatus] = useState('idle'); // idle | loading | error | zoomIn
   const [userLocation, setUserLocation] = useState(null);
   const [flyToUser, setFlyToUser] = useState(null);
   const [locating, setLocating] = useState(false);
@@ -512,8 +550,18 @@ export default function MapView() {
             color: showRivers ? '#38bdf8' : '#e2e8f0', borderRadius: 6, padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', backdropFilter: 'blur(8px)',
           }}
         >
-          🌊 Rivers
+          🌊 Rivers{showRivers && riverStatus === 'loading' ? '…' : ''}
         </button>
+        {showRivers && riverStatus === 'zoomIn' && (
+          <div style={{ background: 'rgba(10,15,28,0.92)', border: '1px solid rgba(255,255,255,0.12)', color: '#94a3b8', borderRadius: 6, padding: '6px 10px', fontSize: 10, maxWidth: 150 }}>
+            Zoom in to load river lines
+          </div>
+        )}
+        {showRivers && riverStatus === 'error' && (
+          <div style={{ background: 'rgba(31,3,3,0.92)', border: '1px solid #ef4444', color: '#ef4444', borderRadius: 6, padding: '6px 10px', fontSize: 10, maxWidth: 150 }}>
+            River data unavailable — try again
+          </div>
+        )}
         <button
           onClick={() => locateMe(true)}
           style={{
@@ -531,7 +579,8 @@ export default function MapView() {
           attribution={satelliteMode ? SATELLITE_TILE.attribution : STREETS_TILE.attribution}
           url={satelliteMode ? SATELLITE_TILE.url : STREETS_TILE.url}
         />
-        <RiverLines enabled={showRivers} />
+        {satelliteMode && <TileLayer url={SATELLITE_LABELS_TILE.url} attribution={SATELLITE_LABELS_TILE.attribution} />}
+        <RiverLines enabled={showRivers} onStatusChange={setRiverStatus} />
         <ZoomTracker onZoom={setZoom} />
         <FlyToDefault view={defaultView} />
         <FlyToLocation position={flyToUser} />
