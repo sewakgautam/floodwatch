@@ -24,3 +24,109 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* FloodWatch admin dashboard design tokens — matches the original app's dark UI */
+.fw {
+  --fw-bg: #09090f;
+  --fw-card: #111118;
+  --fw-card2: #16161f;
+  --fw-border: #1e1e2e;
+  --fw-border-bright: #2a2a3e;
+  --fw-text: #e8e8f0;
+  --fw-text-muted: #6b6b8a;
+  --fw-text-dim: #3a3a55;
+  --fw-accent: #00d4ff;
+  --fw-accent-dim: #00d4ff18;
+  --fw-normal: #22c55e;
+  --fw-watch: #eab308;
+  --fw-warning: #f97316;
+  --fw-critical: #ef4444;
+  --fw-normal-dim: #22c55e18;
+  --fw-watch-dim: #eab30818;
+  --fw-warning-dim: #f9731618;
+  --fw-critical-dim: #ef444418;
+  --fw-font-mono: 'Space Mono', monospace;
+  --fw-font-sans: 'DM Sans', sans-serif;
+  --fw-radius: 8px;
+  --fw-radius-lg: 12px;
+
+  background: var(--fw-bg);
+  color: var(--fw-text);
+  font-family: var(--fw-font-sans);
+  min-height: 100vh;
+}
+
+.fw .card {
+  background: var(--fw-card);
+  border: 1px solid var(--fw-border);
+  border-radius: var(--fw-radius-lg);
+  padding: 20px;
+}
+
+.fw .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-family: var(--fw-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.fw .badge-NORMAL   { background: var(--fw-normal-dim);   color: var(--fw-normal); }
+.fw .badge-WATCH    { background: var(--fw-watch-dim);    color: var(--fw-watch); }
+.fw .badge-WARNING  { background: var(--fw-warning-dim);  color: var(--fw-warning); }
+.fw .badge-CRITICAL { background: var(--fw-critical-dim); color: var(--fw-critical); animation: fw-pulse-critical 1.5s infinite; }
+.fw .badge-OFFLINE  { background: var(--fw-border);       color: var(--fw-text-muted); }
+
+@keyframes fw-pulse-critical {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.fw .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--fw-radius);
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.fw .btn-primary { background: var(--fw-accent); color: var(--fw-bg); }
+.fw .btn-primary:hover { opacity: 0.88; }
+.fw .btn-ghost { background: transparent; color: var(--fw-text-muted); border: 1px solid var(--fw-border); }
+.fw .btn-ghost:hover { border-color: var(--fw-border-bright); color: var(--fw-text); }
+.fw .btn-danger { background: var(--fw-critical-dim); color: var(--fw-critical); border: 1px solid var(--fw-critical); }
+
+.fw .input {
+  width: 100%;
+  background: var(--fw-bg);
+  border: 1px solid var(--fw-border);
+  border-radius: var(--fw-radius);
+  color: var(--fw-text);
+  padding: 9px 12px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: inherit;
+}
+.fw .input:focus { border-color: var(--fw-accent); }
+.fw select.input option { background: var(--fw-card); }
+
+.fw .mono { font-family: var(--fw-font-mono); }
+
+.fw table { width: 100%; border-collapse: collapse; }
+.fw th {
+  padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 600;
+  color: var(--fw-text-muted); text-transform: uppercase; letter-spacing: 0.07em;
+  white-space: nowrap; border-bottom: 1px solid var(--fw-border);
+}
+.fw td { padding: 12px 16px; font-size: 13px; border-bottom: 1px solid var(--fw-border); }
+.fw tbody tr { transition: background 0.1s; }
+.fw tbody tr:hover { background: var(--fw-card2); }

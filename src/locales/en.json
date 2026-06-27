@@ -1,0 +1,143 @@
+{
+  "nav": {
+    "liveMap": "Live Map",
+    "operatorLogin": "Operator Login",
+    "floodwatchNepal": "FloodWatch Nepal"
+  },
+  "hero": {
+    "badge": "LIVE · NEPAL FLOOD EARLY WARNING",
+    "title1": "Real-Time Flood Monitoring",
+    "title2": "Across Nepal",
+    "subtitle": "Live river levels and rainfall data from {{count}}+ monitoring stations. Subscribe to get email alerts when your nearby river reaches warning levels.",
+    "viewMap": "View Live Map →",
+    "getAlerts": "Get Email Alerts"
+  },
+  "stats": {
+    "monitoringStations": "MONITORING STATIONS",
+    "acrossNepal": "across Nepal",
+    "onlineNow": "ONLINE NOW",
+    "reportingLive": "reporting live",
+    "activeAlerts": "ACTIVE ALERTS",
+    "aboveWarning": "above warning level",
+    "critical": "CRITICAL",
+    "immediateAttention": "immediate attention"
+  },
+  "features": {
+    "sectionLabel": "FEATURES",
+    "sectionTitle": "Everything you need to stay safe",
+    "riverLevels": "Real-Time River Levels",
+    "riverLevelsDesc": "Water level data from 295+ DHM monitoring stations updated every 30 minutes. Track river height against warning and danger thresholds.",
+    "rainfall": "Rainfall Monitoring",
+    "rainfallDesc": "6-hour accumulated rainfall readings from stations across all major river basins in Nepal including Koshi, Gandaki, and Karnali.",
+    "emailAlerts": "Email Alert Subscriptions",
+    "emailAlertsDesc": "Subscribe to any station and receive an email the moment water levels reach Watch, Warning, or Critical thresholds. No account needed.",
+    "map": "Interactive Map",
+    "mapDesc": "Color-coded live map showing risk levels across Nepal. Click any station for detailed readings, charts, and historical data."
+  },
+  "howto": {
+    "sectionLabel": "HOW TO GET ALERTS",
+    "sectionTitle": "3 steps, no account required",
+    "step1title": "Open the Map",
+    "step1desc": "Go to the live map and find the river station nearest to you.",
+    "step2title": "Click Get Alerts",
+    "step2desc": "Click on any station marker and press the \"Get Alerts\" button.",
+    "step3title": "Enter Your Email",
+    "step3desc": "Enter your email and choose your alert threshold. Done.",
+    "openMap": "Open Live Map →"
+  },
+  "footer": {
+    "credit": "FloodWatch Nepal · Data from DHM (Department of Hydrology and Meteorology)",
+    "liveMap": "Live Map",
+    "operatorLogin": "Operator Login"
+  },
+  "map": {
+    "clickStation": "Click a station to subscribe for alerts",
+    "nepalFlood": "Nepal Flood Early Warning",
+    "stationsMonitored": "{{count}} stations monitored",
+    "refreshing": "Refreshing…",
+    "updated": "Updated {{time}}",
+    "refresh": "Refresh",
+    "riskLevel": "Risk Level",
+    "noGps": "No GPS Set",
+    "waterLevel": "Water Level",
+    "rainfall6h": "RAINFALL (6h)",
+    "noData": "No data",
+    "flowRate": "Flow rate:",
+    "apiError": "API error: {{msg}}",
+    "criticalMsg": "CRITICAL — Flood risk high. Take precautions.",
+    "warningMsg": "WARNING — Water levels elevated.",
+    "getAlertsBtn": "🔔 Get Alerts for this Station",
+    "trend": {
+      "RISING": "Rising",
+      "FALLING": "Falling",
+      "STEADY": "Steady"
+    }
+  },
+  "subscribe": {
+    "title": "GET ALERTS FOR {{station}}",
+    "emailPlaceholder": "your@email.com",
+    "watchLevel": "Watch level and above",
+    "warningLevel": "Warning level and above",
+    "criticalLevel": "Critical level only",
+    "subscribing": "Subscribing…",
+    "subscribe": "Subscribe",
+    "cancel": "Cancel",
+    "subscribed": "Subscribed!",
+    "checkEmail": "Check your email for confirmation."
+  },
+  "risk": {
+    "NORMAL": "Normal",
+    "WATCH": "Watch",
+    "WARNING": "Warning",
+    "CRITICAL": "Critical",
+    "OFFLINE": "Offline",
+    "ONLINE": "Online"
+  },
+  "sidebar": {
+    "earlyWarning": "EARLY WARNING",
+    "dashboard": "Dashboard",
+    "stations": "Stations",
+    "alerts": "Alerts",
+    "submitData": "Submit Data",
+    "admin": "Admin",
+    "logout": "Logout"
+  },
+  "login": {
+    "subtitle": "Flood Early Warning System",
+    "title": "Sign in to your account",
+    "emailLabel": "Email",
+    "passwordLabel": "Password",
+    "signingIn": "Signing in…",
+    "signIn": "Sign in",
+    "footer": "FloodWatch v1.0 · Delft-FEWS Inspired Architecture"
+  },
+  "unsubscribe": {
+    "processing": "Processing…",
+    "title": "Unsubscribed",
+    "message": "You won't receive any more flood alerts from this subscription.",
+    "backHome": "Back to Home",
+    "invalid": "Link expired or invalid"
+  },
+  "dashboard": {
+    "title": "System Overview",
+    "subtitle": "Real-time hydrological monitoring · auto-refreshes every 60s",
+    "totalStations": "Total Stations",
+    "onlineSub": "{{n}} online",
+    "criticalAlerts": "Critical Alerts",
+    "activeRiskZones": "active risk zones",
+    "warnings": "Warnings",
+    "monitoringRequired": "monitoring required",
+    "recentAlerts": "Recent Alerts",
+    "last20": "last 20 events",
+    "stationRiskLevels": "Station Risk Levels",
+    "viewAll": "View all",
+    "loadingStations": "Loading stations…",
+    "noStations": "No stations found.",
+    "addOne": "Add one",
+    "station": "Station",
+    "status": "Status",
+    "risk": "Risk",
+    "score": "Score",
+    "noRecentAlerts": "No recent alerts"
+  }
+}
