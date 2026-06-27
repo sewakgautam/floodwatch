@@ -8,9 +8,11 @@ export const dynamic = 'force-dynamic';
 const VALID_LEVELS = ['NORMAL', 'WATCH', 'WARNING', 'CRITICAL', null];
 
 /**
- * Sets a manual risk override for one station, fires the alert check immediately
- * (instead of waiting for the next /api/sync cycle), then clears the override —
- * it's a one-time forced notification, not a sticky state that survives a refresh.
+ * Sets a manual risk override for one station and fires the alert check immediately
+ * (instead of waiting for the next /api/sync cycle). The override is sticky — it
+ * persists on the station doc (and wins over the computed risk everywhere: the public
+ * map snapshot, the admin dashboard, future /api/sync runs) until an admin clears it
+ * by setting manualOverride back to null.
  */
 export async function PATCH(request, { params }) {
   const admin = await requireAdmin();
@@ -32,12 +34,23 @@ export async function PATCH(request, { params }) {
       alertsSent = await dispatchStationAlerts(adminDb, { stationId: id, stationName: station.name, effectiveRisk: manualOverride });
     }
 
-    // Always clear afterward — the live computed risk (refreshed by the next /api/sync) takes over again.
-    await stationRef.update({
-      manualOverride: null,
-      manualOverrideBy: FieldValue.delete(),
-      manualOverrideAt: FieldValue.delete(),
-    });
+    if (manualOverride) {
+      await stationRef.update({ manualOverride, manualOverrideBy: admin.email, manualOverrideAt: FieldValue.serverTimestamp() });
+    } else {
+      await stationRef.update({ manualOverride: null, manualOverrideBy: FieldValue.delete(), manualOverrideAt: FieldValue.delete() });
+    }
+
+    // /api/map-data reads this cached snapshot, not the stations collection directly —
+    // patch it in place so the public map reflects the override immediately instead of
+    // waiting for the next /api/sync run (up to a day away on Vercel's free cron).
+    const snapshotRef = adminDb.collection('config').doc('stationsSnapshot');
+    const snapshotDoc = await snapshotRef.get();
+    if (snapshotDoc.exists) {
+      const snapshotStations = (snapshotDoc.data().stations ?? []).map((s) =>
+        s.id === id ? { ...s, risk: manualOverride ?? station.computedRisk ?? 'NORMAL', status: 'ONLINE' } : s,
+      );
+      await snapshotRef.update({ stations: snapshotStations });
+    }
 
     return Response.json({ success: true, alertsSent });
   } catch (err) {
