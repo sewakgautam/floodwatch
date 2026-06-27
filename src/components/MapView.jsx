@@ -1,8 +1,8 @@
 'use client';
 
 import '@/lib/i18n';
-import { useEffect, useState, useCallback } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTranslation } from 'react-i18next';
@@ -309,6 +309,84 @@ function FlyToDefault({ view }) {
   return null;
 }
 
+const SATELLITE_TILE = {
+  url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  attribution: 'Tiles &copy; Esri',
+};
+const STREETS_TILE = {
+  url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+};
+
+function userLocationIcon() {
+  return L.divIcon({
+    html: `<div style="width:14px;height:14px;border-radius:50%;background:#0ea5e9;border:3px solid #fff;box-shadow:0 0 0 2px rgba(14,165,233,0.4),0 1px 4px rgba(0,0,0,0.4);"></div>`,
+    className: '',
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+}
+
+/** Flies to a position once (when it first becomes available), without re-flying on every render. */
+function FlyToLocation({ position }) {
+  const map = useMap();
+  const flownTo = useRef(null);
+  useEffect(() => {
+    if (!position || flownTo.current === position) return;
+    flownTo.current = position;
+    map.flyTo(position, Math.max(map.getZoom(), 12), { duration: 1 });
+  }, [position, map]);
+  return null;
+}
+
+// Below this zoom, an Overpass query would cover too much of the country to be useful
+// (or fast) — river lines only load once the user has zoomed in on a specific area.
+const RIVER_LINE_MIN_ZOOM = 11;
+const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+
+/** Fetches OSM waterway geometry for the current viewport and draws it as polylines. */
+function RiverLines({ enabled }) {
+  const [lines, setLines] = useState([]);
+  const debounceRef = useRef(null);
+
+  const fetchForBounds = useCallback((map) => {
+    if (map.getZoom() < RIVER_LINE_MIN_ZOOM) {
+      setLines([]);
+      return;
+    }
+    const b = map.getBounds();
+    const bbox = `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
+    const query = `[out:json][timeout:25];(way["waterway"~"river|stream"](${bbox}););out geom;`;
+    fetch(OVERPASS_URL, { method: 'POST', body: `data=${encodeURIComponent(query)}` })
+      .then((r) => r.json())
+      .then((data) => {
+        const ways = (data.elements ?? [])
+          .filter((el) => el.type === 'way' && el.geometry)
+          .map((el) => el.geometry.map((g) => [g.lat, g.lon]));
+        setLines(ways);
+      })
+      .catch(() => {}); // Overpass is a shared free service — a failed/rate-limited fetch just means no river lines this time.
+  }, []);
+
+  const map = useMapEvents({
+    moveend: () => {
+      if (!enabled) return;
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => fetchForBounds(map), 600);
+    },
+  });
+
+  useEffect(() => {
+    if (enabled) fetchForBounds(map);
+    else setLines([]);
+  }, [enabled, map, fetchForBounds]);
+
+  if (!enabled) return null;
+  return lines.map((positions, i) => (
+    <Polyline key={i} positions={positions} pathOptions={{ color: '#38bdf8', weight: 2, opacity: 0.7 }} />
+  ));
+}
+
 export default function MapView() {
   const { t } = useTranslation();
   const [stations, setStations] = useState([]);
@@ -319,12 +397,40 @@ export default function MapView() {
   const [currentUser, setCurrentUser] = useState(null);
   const [defaultView, setDefaultView] = useState(null);
   const [mySubscriptions, setMySubscriptions] = useState({});
+  const [satelliteMode, setSatelliteMode] = useState(false);
+  const [showRivers, setShowRivers] = useState(false);
+  const [userLocation, setUserLocation] = useState(null);
+  const [flyToUser, setFlyToUser] = useState(null);
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState(false);
 
   useEffect(() => onAuthStateChanged(auth, setCurrentUser), []);
 
   useEffect(() => {
     fetch('/api/config').then((r) => r.json()).then((d) => setDefaultView(d.mapView)).catch(() => {});
   }, []);
+
+  const locateMe = useCallback((flyAfter) => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = [pos.coords.latitude, pos.coords.longitude];
+        setUserLocation(coords);
+        setLocationError(false);
+        setLocating(false);
+        if (flyAfter) setFlyToUser(coords);
+      },
+      () => {
+        setLocationError(true);
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  }, []);
+
+  // Auto-locate and zoom in on load; the "My Location" button re-runs the same flow on demand.
+  useEffect(() => { locateMe(true); }, [locateMe]);
 
   const loadMySubscriptions = useCallback(() => {
     if (!currentUser) { setMySubscriptions({}); return; }
@@ -389,10 +495,47 @@ export default function MapView() {
         </div>
       )}
 
+      <div style={{ position: 'absolute', top: 64, right: 10, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <button
+          onClick={() => setSatelliteMode((v) => !v)}
+          style={{
+            background: 'rgba(10,15,28,0.92)', border: '1px solid rgba(255,255,255,0.12)', color: '#e2e8f0',
+            borderRadius: 6, padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', backdropFilter: 'blur(8px)',
+          }}
+        >
+          {satelliteMode ? `🗺️ ${t('map.streets')}` : `🛰️ ${t('map.satellite')}`}
+        </button>
+        <button
+          onClick={() => setShowRivers((v) => !v)}
+          style={{
+            background: showRivers ? 'rgba(56,189,248,0.18)' : 'rgba(10,15,28,0.92)', border: `1px solid ${showRivers ? '#38bdf8' : 'rgba(255,255,255,0.12)'}`,
+            color: showRivers ? '#38bdf8' : '#e2e8f0', borderRadius: 6, padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', backdropFilter: 'blur(8px)',
+          }}
+        >
+          🌊 Rivers
+        </button>
+        <button
+          onClick={() => locateMe(true)}
+          style={{
+            background: 'rgba(10,15,28,0.92)', border: '1px solid rgba(255,255,255,0.12)', color: locationError ? '#ef4444' : '#e2e8f0',
+            borderRadius: 6, padding: '6px 12px', fontSize: 11, fontWeight: 600, cursor: 'pointer', backdropFilter: 'blur(8px)',
+          }}
+        >
+          {locating ? `📍 ${t('map.locating')}` : locationError ? `📍 ${t('map.locationDenied')}` : `📍 ${t('map.locateMe')}`}
+        </button>
+      </div>
+
       <MapContainer center={[28.3949, 84.124]} zoom={7} style={{ height: '100%', width: '100%' }} zoomControl={true}>
-        <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <TileLayer
+          key={satelliteMode ? 'satellite' : 'streets'}
+          attribution={satelliteMode ? SATELLITE_TILE.attribution : STREETS_TILE.attribution}
+          url={satelliteMode ? SATELLITE_TILE.url : STREETS_TILE.url}
+        />
+        <RiverLines enabled={showRivers} />
         <ZoomTracker onZoom={setZoom} />
         <FlyToDefault view={defaultView} />
+        <FlyToLocation position={flyToUser} />
+        {userLocation && <Marker position={userLocation} icon={userLocationIcon()} />}
         {mappable.map((s) => (
           <Marker key={`${s.id}-${langKey}`} position={[s.latitude, s.longitude]} icon={makeIcon(s, riskLabels)}>
             <Popup maxWidth={260} minWidth={230}>

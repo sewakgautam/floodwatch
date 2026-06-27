@@ -67,6 +67,11 @@
     "criticalMsg": "CRITICAL — Flood risk high. Take precautions.",
     "warningMsg": "WARNING — Water levels elevated.",
     "getAlertsBtn": "🔔 Get Alerts for this Station",
+    "satellite": "Satellite",
+    "streets": "Streets",
+    "locateMe": "My Location",
+    "locating": "Locating…",
+    "locationDenied": "Location access denied",
     "trend": {
       "RISING": "Rising",
       "FALLING": "Falling",
